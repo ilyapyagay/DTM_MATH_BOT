@@ -53,6 +53,12 @@ async def main():
     if port_str and port_str.isdigit():
         await start_web_server(int(port_str))
 
+    # Удаляем возможный зависший вебхук или старые обновления перед стартом polling
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+    except Exception as e:
+        logging.warning(f"Не удалось удалить вебхук: {e}")
+
     logging.info("🚀 Бот запущен в режиме polling!")
 
     await dp.start_polling(bot)
