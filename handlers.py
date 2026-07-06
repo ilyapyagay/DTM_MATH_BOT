@@ -1,13 +1,14 @@
 import random
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile, InputMediaPhoto
 from aiogram.filters import Command, CommandStart
 from database import (
     get_user, grant_access, get_random_question, update_user_question, get_question_by_id,
     start_dtm_test_for_user, next_dtm_question_for_user, get_question_by_section, record_dtm_answer
 )
 from questions_data import SECTION_NAMES
-from gemini_helper import explain_solution
+from gemini_helper import explain_solution, clean_explanation_text
+from geometry_drawer import generate_geometry_image
 from config import SECRET_INVITE_CODE
 
 router = Router()
@@ -16,26 +17,23 @@ router = Router()
 # ФУНКЦИЯ ДЛЯ РАЗБИЕНИЯ ДЛИННЫХ СООБЩЕНИЙ
 async def send_long_message(message_obj, text: str, max_length: int = 4000):
     """Отправляет длинное сообщение частями, если оно превышает лимит Telegram"""
-    if len(text) <= max_length:
-        await message_obj.answer(text)
+    clean_text = clean_explanation_text(text)
+    if len(clean_text) <= max_length:
+        await message_obj.answer(clean_text)
         return
     
-    # Разбиваем текст на части
     parts = []
     current_part = ""
-    
-    for line in text.split('\n'):
+    for line in clean_text.split('\n'):
         if len(current_part) + len(line) + 1 <= max_length:
             current_part += line + '\n'
         else:
             if current_part:
-                parts.append(current_part)
+                parts.append(current_part.strip())
             current_part = line + '\n'
-    
     if current_part:
-        parts.append(current_part)
+        parts.append(current_part.strip())
     
-    # Отправляем по частям
     for i, part in enumerate(parts):
         if i == 0:
             await message_obj.answer(f"🧑‍🏫 **Объяснение от ИИ-репетитора** (часть {i+1}/{len(parts)}):\n\n{part}")
@@ -44,44 +42,95 @@ async def send_long_message(message_obj, text: str, max_length: int = 4000):
 
 
 def shuffle_options(question):
-    """Перемешивает варианты ответов и возвращает их в новом порядке"""
-    options = [
-        ('A', question.option_a),
-        ('B', question.option_b),
-        ('C', question.option_c),
-        ('D', question.option_d)
-    ]
+    """Перемешивает варианты ответов и распределяет их по кнопкам A, B, C, D"""
+    raw_options = {
+        'A': question.option_a,
+        'B': question.option_b,
+        'C': question.option_c,
+        ('D'): question.option_d
+    }
+    correct_text = raw_options.get(question.correct_answer, question.option_b)
     
-    # Запоминаем правильный ответ
-    correct_text = None
-    for letter, text in options:
-        if letter == question.correct_answer:
-            correct_text = text
-            break
+    texts = [question.option_a, question.option_b, question.option_c, question.option_d]
+    random.shuffle(texts)
     
-    # Перемешиваем варианты
-    random.shuffle(options)
-    
-    # Находим новую букву правильного ответа
-    new_correct_letter = None
-    for letter, text in options:
+    shuffled_options = []
+    new_correct_letter = 'A'
+    letters = ['A', 'B', 'C', 'D']
+    for i, text in enumerate(texts):
+        letter = letters[i]
+        shuffled_options.append((letter, text))
         if text == correct_text:
             new_correct_letter = letter
-            break
+            
+    return shuffled_options, new_correct_letter
+
+
+async def display_question_message(event, header_str: str, question, keyboard):
+    """Универсальная функция для отображения задачи с чертежом PNG (для геометрии) или текстом"""
+    is_geom = (question and question.section_id == 10)
     
-    return options, new_correct_letter
+    raw_text = question.text
+    if is_geom:
+        # Убираем псевдографику ASCII-арта из текста задачи, так как показываем настоящую картинку
+        lines = [line for line in raw_text.split('\n') if not any(c in line for c in '┌─│└┐┘╱╲●')]
+        raw_text = '\n'.join(lines).strip()
+        
+    full_caption_or_text = (
+        f"{header_str}\n"
+        f"📂 **Раздел:** {question.section_name}\n\n"
+        f"📝 **Задача:**\n{raw_text}"
+    )
+    
+    if isinstance(event, CallbackQuery):
+        msg = event.message
+        if is_geom:
+            photo_bytes = generate_geometry_image(question.text)
+            photo_file = BufferedInputFile(photo_bytes, filename=f"geom_{question.id}.png")
+            
+            if msg.photo:
+                try:
+                    await msg.edit_media(
+                        media=InputMediaPhoto(media=photo_file, caption=full_caption_or_text),
+                        reply_markup=keyboard
+                    )
+                    return
+                except Exception:
+                    pass
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await msg.answer_photo(photo=photo_file, caption=full_caption_or_text, reply_markup=keyboard)
+        else:
+            if msg.text:
+                try:
+                    await msg.edit_text(text=full_caption_or_text, reply_markup=keyboard)
+                    return
+                except Exception:
+                    pass
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await msg.answer(text=full_caption_or_text, reply_markup=keyboard)
+    else:
+        if is_geom:
+            photo_bytes = generate_geometry_image(question.text)
+            photo_file = BufferedInputFile(photo_bytes, filename=f"geom_{question.id}.png")
+            await event.answer_photo(photo=photo_file, caption=full_caption_or_text, reply_markup=keyboard)
+        else:
+            await event.answer(text=full_caption_or_text, reply_markup=keyboard)
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     telegram_id = message.from_user.id
     username = message.from_user.username
-    
     args = message.text.split()
     
     if len(args) > 1:
         invite_code = args[1]
-        
         if invite_code == SECRET_INVITE_CODE:
             await grant_access(telegram_id, username)
             await send_welcome_menu(message)
@@ -92,7 +141,6 @@ async def cmd_start(message: Message):
             )
     else:
         user = await get_user(telegram_id)
-        
         if user.has_access:
             await send_welcome_menu(message)
         else:
@@ -123,7 +171,7 @@ async def send_welcome_menu(message: Message):
         "7️⃣ Неравенства\n"
         "8️⃣ Текстовые задачи\n"
         "9️⃣ Функции и их графики\n"
-        "🔟 Основы планиметрии (геометрия)\n\n"
+        "🔟 Основы планиметрии (геометрия с наглядными чертежами)\n\n"
         "💡 **Выберите режим тренировки ниже или используйте команды:**\n"
         "/test — официальный пробный тест из 10 вопросов по порядку\n"
         "/topics — выбор конкретного раздела для тренировки\n"
@@ -143,19 +191,18 @@ async def cmd_help(message: Message):
     await message.answer(
         "📚 **Справка по боту DTM / УзБМБ Math Trainer**\n\n"
         "**Команды:**\n"
-        "/test — запустить пробный тест УзБМБ из 10 вопросов (строго 1 вопрос из каждого из 10 разделов по порядку)\n"
+        "/test — запустить пробный тест УзБМБ из 10 вопросов\n"
         "/topics — тренировка задач по выбранной теме\n"
         "/random — решение случайных задач из общей базы\n"
         "/help — эта справка\n\n"
-        "**Как работает:**\n"
-        "1️⃣ Бот присылает задачу с 4 вариантами ответа (A, B, C, D)\n"
-        "2️⃣ Нажмите на кнопку с выбранным ответом\n"
-        "3️⃣ Если допущена ошибка или решение непонятно — нажмите «🤷‍♂️ Объяснить решение (ИИ)», и ИИ-репетитор пошагово объяснит задачу!\n\n"
-        "💡 Варианты ответов при каждом показе перемешиваются — учите математические принципы!"
+        "**Особенности:**\n"
+        "1️⃣ Варианты ответов A, B, C, D каждый раз перемешиваются и равномерно распределяются!\n"
+        "2️⃣ Задачи по геометрии сопровождаются наглядными графическими чертежами-картинками (PNG)\n"
+        "3️⃣ При нажатии «🤷‍♂️ Объяснить решение (ИИ)» выдается чистое пошаговое объяснение без лишних символов Markdown."
     )
 
 
-# --- 10-ВОПРОСНЫЙ ТЕСТ УЗБМБ (ПО ПОРЯДКУ РАЗДЕЛОВ 1..10) ---
+# --- 10-ВОПРОСНЫЙ ТЕСТ УЗБМБ ---
 
 @router.message(Command("test"))
 async def cmd_test(message: Message):
@@ -163,7 +210,6 @@ async def cmd_test(message: Message):
     if not user.has_access:
         await message.answer("❌ У вас нет доступа к боту.")
         return
-    
     await run_dtm_test_start(message, user.telegram_id)
 
 
@@ -173,19 +219,18 @@ async def cb_start_dtm_test(callback: CallbackQuery):
     if not user.has_access:
         await callback.answer("❌ Нет доступа", show_alert=True)
         return
-    
     await callback.answer()
-    await run_dtm_test_start(callback.message, user.telegram_id, is_edit=True)
+    await run_dtm_test_start(callback, user.telegram_id)
 
 
-async def run_dtm_test_start(message_or_msg, telegram_id: int, is_edit: bool = False):
+async def run_dtm_test_start(event, telegram_id: int):
     question = await start_dtm_test_for_user(telegram_id)
     if not question:
         text = "❌ В базе пока нет вопросов по разделу 1."
-        if is_edit:
-            await message_or_msg.edit_text(text)
+        if isinstance(event, CallbackQuery):
+            await event.message.answer(text)
         else:
-            await message_or_msg.answer(text)
+            await event.answer(text)
         return
     
     shuffled_options, new_correct = shuffle_options(question)
@@ -196,16 +241,8 @@ async def run_dtm_test_start(message_or_msg, telegram_id: int, is_edit: bool = F
         )] for letter, text in shuffled_options
     ])
     
-    text = (
-        "🎯 **Обязательный (базовый) блок тестирования УзБМБ**\n"
-        "📌 **Вопрос 1 из 10**\n"
-        f"📂 **Раздел:** {question.section_name}\n\n"
-        f"📝 **Задача:**\n{question.text}"
-    )
-    if is_edit:
-        await message_or_msg.edit_text(text, reply_markup=keyboard)
-    else:
-        await message_or_msg.answer(text, reply_markup=keyboard)
+    header = "🎯 **Обязательный (базовый) блок тестирования УзБМБ**\n📌 **Вопрос 1 из 10**"
+    await display_question_message(event, header, question, keyboard)
 
 
 @router.callback_query(F.data == "dtm_next")
@@ -223,13 +260,8 @@ async def cb_dtm_next(callback: CallbackQuery):
         )] for letter, text in shuffled_options
     ])
     
-    await callback.message.edit_text(
-        "🎯 **Обязательный (базовый) блок тестирования УзБМБ**\n"
-        f"📌 **Вопрос {user.dtm_step} из 10**\n"
-        f"📂 **Раздел:** {question.section_name}\n\n"
-        f"📝 **Задача:**\n{question.text}",
-        reply_markup=keyboard
-    )
+    header = f"🎯 **Обязательный (базовый) блок тестирования УзБМБ**\n📌 **Вопрос {user.dtm_step} из 10**"
+    await display_question_message(callback, header, question, keyboard)
     await callback.answer()
 
 
@@ -251,7 +283,7 @@ async def cb_dtm_finish(callback: CallbackQuery):
         [InlineKeyboardButton(text="📚 Выбрать тему для тренировки", callback_data="show_topics")]
     ])
     
-    await callback.message.edit_text(
+    text = (
         "🏁 **Тестирование УзБМБ (Базовый блок) завершено!**\n\n"
         f"📊 **Ваш итоговый балл:** **{score} из 10** ({percent}%)\n\n"
         f"{msg}\n\n"
@@ -265,9 +297,21 @@ async def cb_dtm_finish(callback: CallbackQuery):
         "7️⃣ Неравенства\n"
         "8️⃣ Текстовые задачи\n"
         "9️⃣ Функции и их графики\n"
-        "🔟 Основы планиметрии (геометрия)",
-        reply_markup=keyboard
+        "🔟 Основы планиметрии (геометрия)"
     )
+    
+    msg_obj = callback.message
+    if msg_obj.photo:
+        try:
+            await msg_obj.delete()
+        except Exception:
+            pass
+        await msg_obj.answer(text=text, reply_markup=keyboard)
+    else:
+        try:
+            await msg_obj.edit_text(text=text, reply_markup=keyboard)
+        except Exception:
+            await msg_obj.answer(text=text, reply_markup=keyboard)
     await callback.answer()
 
 
@@ -293,7 +337,6 @@ async def process_answer(callback: CallbackQuery):
     else:
         result_text = f"❌ **Неправильно.** Правильный ответ: **{correct_answer}**\n\n💡 Нажмите кнопку ниже, чтобы ИИ-репетитор объяснил решение!"
     
-    # Формируем кнопки в зависимости от режима тренировки
     buttons = [
         [InlineKeyboardButton(text="🤷‍♂️ Объяснить решение (ИИ)", callback_data=f"explain_{question_id}")]
     ]
@@ -316,18 +359,49 @@ async def process_answer(callback: CallbackQuery):
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     
-    await callback.message.edit_text(
+    is_geom = (question.section_id == 10)
+    raw_text = question.text
+    if is_geom:
+        lines = [line for line in raw_text.split('\n') if not any(c in line for c in '┌─│└┐┘╱╲●')]
+        raw_text = '\n'.join(lines).strip()
+        
+    full_text = (
         f"{header}\n"
         f"📂 **Раздел:** {question.section_name}\n\n"
-        f"📝 **Задача:**\n{question.text}\n\n"
-        f"{result_text}",
-        reply_markup=keyboard
+        f"📝 **Задача:**\n{raw_text}\n\n"
+        f"{result_text}"
     )
+    
+    msg = callback.message
+    if msg.photo:
+        try:
+            photo_bytes = generate_geometry_image(question.text)
+            photo_file = BufferedInputFile(photo_bytes, filename=f"geom_{question.id}.png")
+            await msg.edit_media(
+                media=InputMediaPhoto(media=photo_file, caption=full_text),
+                reply_markup=keyboard
+            )
+        except Exception:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await msg.answer_photo(
+                photo=BufferedInputFile(generate_geometry_image(question.text), filename="geom.png"),
+                caption=full_text,
+                reply_markup=keyboard
+            )
+    else:
+        try:
+            await msg.edit_text(text=full_text, reply_markup=keyboard)
+        except Exception:
+            await msg.answer(text=full_text, reply_markup=keyboard)
+            
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("explain_"))
-async def explain_question(callback: CallbackQuery):
+async def explain_question_handler(callback: CallbackQuery):
     question_id = int(callback.data.split("_")[1])
     question = await get_question_by_id(question_id)
     
@@ -363,13 +437,12 @@ async def cmd_topics(message: Message):
 
 @router.callback_query(F.data == "show_topics")
 async def cb_show_topics(callback: CallbackQuery):
-    await send_topics_list(callback.message, is_edit=True)
+    await send_topics_list(callback, is_edit=True)
     await callback.answer()
 
 
-async def send_topics_list(msg: Message, is_edit: bool = False):
+async def send_topics_list(event, is_edit: bool = False):
     buttons = []
-    # Отображаем 10 разделов
     for sec_id in range(1, 11):
         sec_name = SECTION_NAMES.get(sec_id, f"Раздел {sec_id}")
         buttons.append([InlineKeyboardButton(text=sec_name, callback_data=f"topic_select_{sec_id}")])
@@ -382,10 +455,21 @@ async def send_topics_list(msg: Message, is_edit: bool = False):
         "Обязательный (базовый) блок по математике включает 10 разделов:\n"
         "Выберите тему, чтобы отработать задачи именно этого раздела:"
     )
-    if is_edit:
-        await msg.edit_text(text, reply_markup=keyboard)
+    if isinstance(event, CallbackQuery):
+        msg = event.message
+        if msg.photo:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await msg.answer(text=text, reply_markup=keyboard)
+        else:
+            try:
+                await msg.edit_text(text, reply_markup=keyboard)
+            except Exception:
+                await msg.answer(text, reply_markup=keyboard)
     else:
-        await msg.answer(text, reply_markup=keyboard)
+        await event.answer(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("topic_select_"))
@@ -405,12 +489,8 @@ async def cb_topic_select(callback: CallbackQuery):
         )] for letter, text in shuffled_options
     ])
     
-    await callback.message.edit_text(
-        f"📚 **Тренировка • Раздел {sec_id}**\n"
-        f"📂 **Тема:** {question.section_name}\n\n"
-        f"📝 **Задача:**\n{question.text}",
-        reply_markup=keyboard
-    )
+    header = f"📚 **Тренировка • Раздел {sec_id}**"
+    await display_question_message(callback, header, question, keyboard)
     await callback.answer()
 
 
@@ -427,22 +507,22 @@ async def cmd_random(message: Message):
 
 @router.callback_query(F.data == "random_next")
 async def cb_random_next(callback: CallbackQuery):
-    await send_random_question(callback.message, callback.from_user.id, is_edit=True)
+    await send_random_question(callback, callback.from_user.id)
     await callback.answer()
 
 
-async def send_random_question(msg: Message, telegram_id: int, is_edit: bool = False):
+async def send_random_question(event, telegram_id: int):
     user = await get_user(telegram_id)
     user.test_mode = "random"
-    await update_user_question(telegram_id, user.current_question_id)  # сохраним режим в сессии
+    await update_user_question(telegram_id, user.current_question_id)
     
     question = await get_random_question()
     if not question:
         text = "❌ В базе нет вопросов."
-        if is_edit:
-            await msg.edit_text(text)
+        if isinstance(event, CallbackQuery):
+            await event.message.answer(text)
         else:
-            await msg.answer(text)
+            await event.answer(text)
         return
     
     shuffled_options, new_correct = shuffle_options(question)
@@ -453,15 +533,8 @@ async def send_random_question(msg: Message, telegram_id: int, is_edit: bool = F
         )] for letter, text in shuffled_options
     ])
     
-    text = (
-        "🎲 **Случайная задача из базы УзБМБ**\n"
-        f"📂 **Раздел:** {question.section_name}\n\n"
-        f"📝 **Задача:**\n{question.text}"
-    )
-    if is_edit:
-        await msg.edit_text(text, reply_markup=keyboard)
-    else:
-        await msg.answer(text, reply_markup=keyboard)
+    header = "🎲 **Случайная задача из базы УзБМБ**"
+    await display_question_message(event, header, question, keyboard)
 
 
 @router.callback_query(F.data == "ignore")
