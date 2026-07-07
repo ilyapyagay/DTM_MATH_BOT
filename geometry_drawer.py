@@ -30,7 +30,6 @@ def draw_function_graph(eq_str="y = kx + b", func_type="linear", k=1.0, b=0.0, a
     ox, oy = 260, 220
     scale = 20
     
-    # Сетка
     for x in range(-12, 13):
         px = ox + x * scale
         color = "#cbd5e1" if x == 0 else "#e2e8f0"
@@ -47,14 +46,12 @@ def draw_function_graph(eq_str="y = kx + b", func_type="linear", k=1.0, b=0.0, a
         if y != 0 and y % 5 == 0:
             draw.text((ox + 6, py - 8), str(y), fill="#64748b", font=font_sm)
             
-    # Оси и стрелки
     draw.line([(495, oy-5), (500, oy), (495, oy+5)], fill="#0f172a", width=2)
     draw.line([(ox-5, 53), (ox, 48), (ox+5, 53)], fill="#0f172a", width=2)
     draw.text((485, oy - 25), "x", fill="#0f172a", font=font_title)
     draw.text((ox + 10, 48), "y", fill="#0f172a", font=font_title)
     draw.text((ox - 15, oy + 5), "0", fill="#0f172a", font=font_sm)
     
-    # Линия графика
     points = []
     for step in range(-250, 251):
         x_val = step / 20.0
@@ -70,14 +67,11 @@ def draw_function_graph(eq_str="y = kx + b", func_type="linear", k=1.0, b=0.0, a
     if len(points) > 1:
         draw.line(points, fill="#2563eb", width=4)
         
-    # Точки пересечения или вершина
     if func_type == "linear":
-        # Пересечение с Oy (0, b)
         py_int = oy - b * scale
         if 48 <= py_int <= 385:
             draw.ellipse([ox-5, py_int-5, ox+5, py_int+5], fill="#dc2626")
     else:
-        # Вершина параболы (-k/(2a), c - k^2/(4a))
         vx = -k / (2 * a) if a != 0 else 0
         vy = a * (vx**2) + k * vx + b
         px_v = ox + vx * scale
@@ -89,7 +83,182 @@ def draw_function_graph(eq_str="y = kx + b", func_type="linear", k=1.0, b=0.0, a
     return img
 
 
-# --- ОТРИСОВКА ГЕОМЕТРИИ (РАЗДЕЛ 10) С УЧЕТОМ УСЛОВИЙ ---
+# --- ОТРИСОВКА ЗАДАЧ НА УГЛЫ ---
+
+def draw_triangle_angles(a1="90°", a2="35°", a3="?", title="Углы треугольника (Сумма 180°)"):
+    img = Image.new("RGB", (520, 380), color="#f8fafc")
+    draw = ImageDraw.Draw(img)
+    font_title = get_font(21)
+    font_label = get_font(18)
+    
+    draw.text((25, 20), title, fill="#0f172a", font=font_title)
+    x1, y1 = 120, 310
+    x2, y2 = 420, 310
+    x3, y3 = 120, 90
+    
+    draw.polygon([(x1, y1), (x2, y2), (x3, y3)], fill="#fef9c3", outline="#ca8a04", width=4)
+    
+    if "90" in str(a1):
+        m = 22
+        draw.line([(x1+m, y1), (x1+m, y1-m), (x1, y1-m)], fill="#dc2626", width=3)
+        draw.text((x1 + 8, y1 - 32), "90°", fill="#dc2626", font=font_label)
+    else:
+        draw.text((x1 + 10, y1 - 30), str(a1), fill="#dc2626", font=font_label)
+        
+    draw.arc([x2-80, y2-80, x2+80, y2+80], start=180, end=216, fill="#2563eb", width=3)
+    draw.text((x2 - 110, y2 - 35), str(a2), fill="#2563eb", font=font_label)
+    
+    draw.arc([x3-60, y3-60, x3+60, y3+60], start=0, end=54, fill="#16a34a", width=3)
+    draw.text((x3 + 20, y3 + 35), str(a3), fill="#16a34a", font=font_label)
+    return img
+
+
+def draw_isosceles_angles(base_ang="50°", vert_ang="?", title="Равнобедренный треугольник"):
+    img = Image.new("RGB", (520, 380), color="#f8fafc")
+    draw = ImageDraw.Draw(img)
+    font_title = get_font(21)
+    font_label = get_font(18)
+    
+    draw.text((25, 20), title, fill="#0f172a", font=font_title)
+    x1, y1 = 100, 310
+    x2, y2 = 420, 310
+    x3, y3 = 260, 80
+    
+    draw.polygon([(x1, y1), (x2, y2), (x3, y3)], fill="#f3e8ff", outline="#9333ea", width=4)
+    
+    # Отметки равенства сторон
+    draw.line([((x1+x3)//2 - 10, (y1+y3)//2 - 5), ((x1+x3)//2 + 5, (y1+y3)//2 + 10)], fill="#9333ea", width=3)
+    draw.line([((x2+x3)//2 - 5, (y2+y3)//2 + 10), ((x2+x3)//2 + 10, (y2+y3)//2 - 5)], fill="#9333ea", width=3)
+    
+    # Углы при основании равны
+    draw.arc([x1-50, y1-50, x1+50, y1+50], start=305, end=360, fill="#2563eb", width=3)
+    draw.arc([x2-50, y2-50, x2+50, y2+50], start=180, end=235, fill="#2563eb", width=3)
+    draw.text((x1 + 45, y1 - 25), str(base_ang), fill="#2563eb", font=font_label)
+    draw.text((x2 - 85, y2 - 25), str(base_ang), fill="#2563eb", font=font_label)
+    
+    # Угол при вершине
+    draw.arc([x3-50, y3-50, x3+50, y3+50], start=55, end=125, fill="#dc2626", width=3)
+    draw.text((x3 - 15, y3 + 50), str(vert_ang), fill="#dc2626", font=font_label)
+    return img
+
+
+def draw_adjacent_angles(a1="α", a2="β", title="Смежные углы (Сумма 180°)"):
+    img = Image.new("RGB", (520, 380), color="#f8fafc")
+    draw = ImageDraw.Draw(img)
+    font_title = get_font(21)
+    font_label = get_font(18)
+    
+    draw.text((25, 20), title, fill="#0f172a", font=font_title)
+    cx, cy = 260, 280
+    
+    draw.line([(60, cy), (460, cy)], fill="#0f172a", width=4)
+    ang = math.radians(65)
+    rx = cx + 180 * math.cos(ang)
+    ry = cy - 180 * math.sin(ang)
+    draw.line([(cx, cy), (rx, ry)], fill="#2563eb", width=4)
+    
+    draw.arc([cx-60, cy-60, cx+60, cy+60], start=180, end=360-65, fill="#dc2626", width=3)
+    draw.arc([cx-45, cy-45, cx+45, cy+45], start=360-65, end=360, fill="#16a34a", width=3)
+    
+    draw.text((cx - 95, cy - 45), str(a1), fill="#dc2626", font=font_label)
+    draw.text((cx + 55, cy - 45), str(a2), fill="#16a34a", font=font_label)
+    return img
+
+
+def draw_vertical_angles(a1="α", a2="β", title="Вертикальные углы (Равны друг другу)"):
+    img = Image.new("RGB", (520, 380), color="#f8fafc")
+    draw = ImageDraw.Draw(img)
+    font_title = get_font(21)
+    font_label = get_font(18)
+    
+    draw.text((25, 20), title, fill="#0f172a", font=font_title)
+    cx, cy = 260, 200
+    
+    draw.line([(80, 320), (440, 80)], fill="#0f172a", width=4)
+    draw.line([(80, 80), (440, 320)], fill="#0f172a", width=4)
+    
+    draw.arc([cx-50, cy-50, cx+50, cy+50], start=360-33, end=33, fill="#dc2626", width=3)
+    draw.arc([cx-50, cy-50, cx+50, cy+50], start=180-33, end=180+33, fill="#dc2626", width=3)
+    
+    draw.text((cx - 95, cy - 12), str(a1), fill="#dc2626", font=font_label)
+    draw.text((cx + 60, cy - 12), str(a2), fill="#dc2626", font=font_label)
+    return img
+
+
+def draw_angle_bisector(total="80°", half="?", title="Биссектриса угла (Делит угол пополам)"):
+    img = Image.new("RGB", (520, 380), color="#f8fafc")
+    draw = ImageDraw.Draw(img)
+    font_title = get_font(21)
+    font_label = get_font(18)
+    
+    draw.text((25, 20), title, fill="#0f172a", font=font_title)
+    cx, cy = 120, 290
+    
+    draw.line([(cx, cy), (440, cy)], fill="#0f172a", width=4)
+    ang_tot = math.radians(70)
+    rx = cx + 280 * math.cos(ang_tot)
+    ry = cy - 280 * math.sin(ang_tot)
+    draw.line([(cx, cy), (rx, ry)], fill="#0f172a", width=4)
+    
+    # Биссектриса (пунктир или зеленый)
+    ang_half = math.radians(35)
+    bx = cx + 290 * math.cos(ang_half)
+    by = cy - 290 * math.sin(ang_half)
+    draw.line([(cx, cy), (bx, by)], fill="#16a34a", width=3)
+    
+    draw.arc([cx-70, cy-70, cx+70, cy+70], start=360-70, end=360-35, fill="#2563eb", width=3)
+    draw.arc([cx-55, cy-55, cx+55, cy+55], start=360-35, end=360, fill="#2563eb", width=3)
+    
+    draw.text((cx + 80, cy - 85), f"Половина = {half}", fill="#16a34a", font=font_label)
+    draw.text((cx + 90, cy - 30), f"Половина = {half}", fill="#16a34a", font=font_label)
+    draw.text((25, 340), f"Весь угол = {total}", fill="#0f172a", font=font_label)
+    return img
+
+
+def draw_quadrilateral_angles(a1="80°", a2="90°", a3="100°", a4="?", title="Углы четырехугольника (Сумма 360°)"):
+    img = Image.new("RGB", (520, 380), color="#f8fafc")
+    draw = ImageDraw.Draw(img)
+    font_title = get_font(21)
+    font_label = get_font(18)
+    
+    draw.text((25, 20), title, fill="#0f172a", font=font_title)
+    x1, y1 = 110, 300
+    x2, y2 = 410, 300
+    x3, y3 = 340, 100
+    x4, y4 = 160, 120
+    
+    draw.polygon([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], fill="#e0f2fe", outline="#0284c7", width=4)
+    
+    draw.text((x1 + 15, y1 - 35), str(a1), fill="#0f172a", font=font_label)
+    draw.text((x2 - 55, y2 - 35), str(a2), fill="#0f172a", font=font_label)
+    draw.text((x3 - 55, y3 + 15), str(a3), fill="#0f172a", font=font_label)
+    draw.text((x4 + 15, y4 + 15), str(a4), fill="#dc2626", font=font_label)
+    return img
+
+
+def draw_parallelogram_angles(acute="60°", obtuse="?", title="Углы параллелограмма / Ромба"):
+    img = Image.new("RGB", (520, 380), color="#f8fafc")
+    draw = ImageDraw.Draw(img)
+    font_title = get_font(21)
+    font_label = get_font(18)
+    
+    draw.text((25, 20), title, fill="#0f172a", font=font_title)
+    shift = 90
+    x1, y1 = 120, 290
+    x2, y2 = 410, 290
+    x3, y3 = 410 + shift, 110
+    x4, y4 = 120 + shift, 110
+    
+    draw.polygon([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], fill="#dcfce7", outline="#16a34a", width=4)
+    
+    draw.text((x1 + 25, y1 - 32), str(acute), fill="#2563eb", font=font_label)
+    draw.text((x3 - 65, y3 + 12), str(acute), fill="#2563eb", font=font_label)
+    draw.text((x2 - 45, y2 - 32), str(obtuse), fill="#dc2626", font=font_label)
+    draw.text((x4 + 15, y4 + 12), str(obtuse), fill="#dc2626", font=font_label)
+    return img
+
+
+# --- ОСНОВНЫЕ ФИГУРЫ ---
 
 def draw_rectangle(w_text="a", h_text="b", title="Прямоугольник"):
     img = Image.new("RGB", (520, 380), color="#f8fafc")
@@ -99,7 +268,6 @@ def draw_rectangle(w_text="a", h_text="b", title="Прямоугольник"):
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
     x1, y1, x2, y2 = 110, 90, 410, 270
-    
     draw.rectangle([x1, y1, x2, y2], fill="#e0f2fe", outline="#0284c7", width=4)
     
     m = 15
@@ -108,11 +276,6 @@ def draw_rectangle(w_text="a", h_text="b", title="Прямоугольник"):
         
     draw.text(((x1+x2)//2 - 25, y2 + 12), str(w_text), fill="#0f172a", font=font_label)
     draw.text((x2 + 15, (y1+y2)//2 - 10), str(h_text), fill="#0f172a", font=font_label)
-    
-    draw.text((x1-25, y1-25), "A", fill="#64748b", font=font_label)
-    draw.text((x2+10, y1-25), "B", fill="#64748b", font=font_label)
-    draw.text((x2+10, y2+10), "C", fill="#64748b", font=font_label)
-    draw.text((x1-25, y2+10), "D", fill="#64748b", font=font_label)
     return img
 
 
@@ -124,7 +287,6 @@ def draw_square(side_text="a", title="Квадрат"):
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
     x1, y1, x2, y2 = 150, 80, 370, 300
-    
     draw.rectangle([x1, y1, x2, y2], fill="#dcfce7", outline="#16a34a", width=4)
     
     for (lx1, ly1, lx2, ly2) in [
@@ -152,7 +314,6 @@ def draw_right_triangle(cat1="a", cat2="b", hypot="c", title="Прямоугол
     x3, y3 = 120, 80
     
     draw.polygon([(x1, y1), (x2, y2), (x3, y3)], fill="#fef9c3", outline="#ca8a04", width=4)
-    
     m = 20
     draw.line([(x1+m, y1), (x1+m, y1-m), (x1, y1-m)], fill="#ca8a04", width=2)
     
@@ -192,7 +353,6 @@ def draw_circle(rad="R", diam=None, title="Окружность / Круг"):
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
     cx, cy, r = 260, 210, 110
-    
     draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill="#fee2e2", outline="#dc2626", width=4)
     draw.ellipse([cx-5, cy-5, cx+5, cy+5], fill="#dc2626")
     draw.text((cx-15, cy+8), "O", fill="#0f172a", font=font_label)
@@ -203,30 +363,6 @@ def draw_circle(rad="R", diam=None, title="Окружность / Круг"):
     else:
         draw.line([(cx, cy), (cx+r, cy)], fill="#dc2626", width=3)
         draw.text((cx + r//2 - 20, cy - 28), f"R = {rad}", fill="#0f172a", font=font_label)
-        
-    return img
-
-
-def draw_adjacent_angles(a1="α", a2="β", title="Смежные углы (Сумма 180°)"):
-    img = Image.new("RGB", (520, 380), color="#f8fafc")
-    draw = ImageDraw.Draw(img)
-    font_title = get_font(21)
-    font_label = get_font(18)
-    
-    draw.text((25, 20), title, fill="#0f172a", font=font_title)
-    cx, cy = 260, 280
-    
-    draw.line([(60, cy), (460, cy)], fill="#0f172a", width=4)
-    ang = math.radians(65)
-    rx = cx + 180 * math.cos(ang)
-    ry = cy - 180 * math.sin(ang)
-    draw.line([(cx, cy), (rx, ry)], fill="#2563eb", width=4)
-    
-    draw.arc([cx-60, cy-60, cx+60, cy+60], start=180, end=360-65, fill="#dc2626", width=3)
-    draw.arc([cx-45, cy-45, cx+45, cy+45], start=360-65, end=360, fill="#16a34a", width=3)
-    
-    draw.text((cx - 80, cy - 40), str(a1), fill="#dc2626", font=font_label)
-    draw.text((cx + 50, cy - 40), str(a2), fill="#16a34a", font=font_label)
     return img
 
 
@@ -238,7 +374,6 @@ def draw_clock(hour=3, title="Циферблат часов"):
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
     cx, cy, r = 260, 210, 110
-    
     draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill="#ffffff", outline="#0f172a", width=4)
     draw.ellipse([cx-5, cy-5, cx+5, cy+5], fill="#0f172a")
     
@@ -255,123 +390,115 @@ def draw_clock(hour=3, title="Циферблат часов"):
     draw.line([(cx, cy), (hx, hy)], fill="#dc2626", width=6)
     
     angle_deg = (hour % 12) * 30
-    if angle_deg > 180:
-        angle_deg = 360 - angle_deg
+    if angle_deg > 180: angle_deg = 360 - angle_deg
     draw.text((25, 340), f"Угол между стрелками: {angle_deg}°", fill="#dc2626", font=font_label)
     return img
 
 
 def generate_geometry_image(question_text: str, section_id: int = 10) -> bytes:
-    """Интеллектуальная генерация графика (Раздел 9) или геометрического чертежа по условию (Раздел 10)"""
+    """Интеллектуальная генерация чертежа (Раздел 10) или графика (Раздел 9) по условиям задачи"""
     text = question_text.lower()
+    nums = re.findall(r'\b\d+(?:[\.,]\d+)?\b', question_text)
     
     # 1. РАЗДЕЛ 9: ФУНКЦИИ И ГРАФИКИ
     if section_id == 9 or any(k in text for k in ["функци", "график", "парабол", "угловой коэффициент"]):
-        # Поиск линейного уравнения вида y = kx + b
         lin_m = re.search(r'y\s*=\s*(-?\d*(?:\.\d+)?)\s*x\s*([\+\-]\s*\d+(?:\.\d+)?)?', text)
-        quad_m = re.search(r'y\s*=\s*(-?\d*)\s*x[²2]\s*([\+\-]\s*\d+)?\s*x?\s*([\+\-]\s*\d+)?', text)
-        
         if "²" in text or "x^2" in text or "парабол" in text:
-            # Отрисовка параболы
             a_val, b_val = 1.0, 0.0
-            if " - " in text and "x²" in text:
-                b_val = -4.0
-            img = draw_function_graph(eq_str="y = ax² + bx + c", func_type="quad", k=b_val, a=a_val)
+            if " - " in text and "x²" in text: b_val = -4.0
+            img = draw_function_graph("y = ax² + bx + c", "quad", b_val, 0.0, a_val)
         elif lin_m:
-            k_str = lin_m.group(1)
-            b_str = lin_m.group(2)
+            k_str, b_str = lin_m.group(1), lin_m.group(2)
             k_val = float(k_str) if k_str not in ["", "-", "+"] else (-1.0 if k_str=="-" else 1.0)
             b_val = float(b_str.replace(" ", "")) if b_str else 0.0
-            img = draw_function_graph(eq_str=f"y = {k_val}x + {b_val}", func_type="linear", k=k_val, b=b_val)
+            img = draw_function_graph(f"y = {k_val}x + {b_val}", "linear", k_val, b_val)
         else:
-            img = draw_function_graph(eq_str="y = kx + b", func_type="linear", k=2.0, b=1.0)
+            img = draw_function_graph("y = kx + b", "linear", 2.0, 1.0)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    # 2. РАЗДЕЛ 10: ПЛАНИМЕТРИЯ — УГЛЫ
+    if "угл" in text or "°" in question_text or "смежн" in text or "вертикальн" in text or "биссектрис" in text:
+        if "смежн" in text:
+            if "в 4 раза" in text:
+                img = draw_adjacent_angles("x", "4x", "Смежные углы (Сумма 180° = x + 4x)")
+            elif len(nums) > 0:
+                val = float(nums[0].replace(',', '.'))
+                if val < 90: img = draw_adjacent_angles(f"{nums[0]}°", "?")
+                else: img = draw_adjacent_angles("?", f"{nums[0]}°")
+            else:
+                img = draw_adjacent_angles("α", "β")
+        elif "вертикальн" in text:
+            val = nums[0] + "°" if len(nums) > 0 else "α"
+            img = draw_vertical_angles(val, val)
+        elif "биссектрис" in text:
+            if "развернут" in text: img = draw_angle_bisector("180°", "90°", "Биссектриса развернутого угла")
+            else: img = draw_angle_bisector(nums[0]+"°" if len(nums)>0 else "80°", "?")
+        elif "равнобедрен" in text and "угл" in text:
+            base = nums[0]+"°" if len(nums)>0 else "50°"
+            img = draw_isosceles_angles(base, "?")
+        elif "четырехугольник" in text and "угл" in text:
+            img = draw_quadrilateral_angles(nums[0]+"°" if len(nums)>0 else "80°", nums[1]+"°" if len(nums)>1 else "90°", nums[2]+"°" if len(nums)>2 else "100°", "?")
+        elif any(k in text for k in ["ромб", "параллелограмм"]) and "угл" in text:
+            img = draw_parallelogram_angles(nums[0]+"°" if len(nums)>0 else "60°", "?")
+        elif "треугольник" in text and ("90°" in question_text or "прямоугольн" in text):
+            ang2 = nums[0]+"°" if len(nums)>0 and nums[0]!="90" else (nums[1]+"°" if len(nums)>1 else "35°")
+            img = draw_triangle_angles("90°", ang2, "?")
+        elif any(k in text for k in ["час", "стрелк", "циферблат"]):
+            hr = int(nums[0]) if len(nums) > 0 and int(nums[0]) <= 12 else 3
+            img = draw_clock(hr)
+        else:
+            img = draw_triangle_angles("α", "β", "?", "Углы в геометрии")
             
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         return buf.getvalue()
 
-    # 2. РАЗДЕЛ 10: ПЛАНИМЕТРИЯ (ГЕОМЕТРИЯ)
-    nums = re.findall(r'\b\d+(?:[\.,]\d+)?\b', question_text)
-    
+    # 3. РАЗДЕЛ 10: ПЛАНИМЕТРИЯ — ФИГУРЫ
     if "прямоугольник" in text and "треугольник" not in text:
-        # Анализ условия на периметр / площадь / длину / ширину
-        p_match = re.search(r'периметр[^\d]*(\d+)', text)
-        s_match = re.search(r'площад[^\d]*(\d+)', text)
-        l_match = re.search(r'длин[^\d]*(\d+)', text)
-        w_match = re.search(r'ширин[^\d]*(\d+)', text)
+        p_m = re.search(r'периметр[^\d]*(\d+)', text)
+        s_m = re.search(r'площад[^\d]*(\d+)', text)
+        l_m = re.search(r'длин[^\d]*(\d+)', text)
+        w_m = re.search(r'ширин[^\d]*(\d+)', text)
         
-        w_val = w_match.group(1) + " см" if w_match else ("?" if (p_match or s_match) and l_match else (nums[0]+" см" if len(nums)>0 else "a"))
-        h_val = l_match.group(1) + " см" if l_match else ("?" if (p_match or s_match) and w_match else (nums[1]+" см" if len(nums)>1 else "b"))
+        w_val = w_m.group(1)+" см" if w_m else ("?" if (p_m or s_m) and l_m else (nums[0]+" см" if len(nums)>0 else "a"))
+        h_val = l_m.group(1)+" см" if l_m else ("?" if (p_m or s_m) and w_m else (nums[1]+" см" if len(nums)>1 else "b"))
         
         title = "Прямоугольник"
-        if p_match:
-            title = f"Прямоугольник (Периметр P = {p_match.group(1)})"
-        elif s_match:
-            title = f"Прямоугольник (Площадь S = {s_match.group(1)})"
-            
+        if p_m: title = f"Прямоугольник (Периметр P = {p_m.group(1)})"
+        elif s_m: title = f"Прямоугольник (Площадь S = {s_m.group(1)})"
         img = draw_rectangle(w_val, h_val, title)
         
     elif "квадрат" in text:
-        p_match = re.search(r'периметр[^\d]*(\d+)', text)
-        s_match = re.search(r'площад[^\d]*(\d+)', text)
-        
-        side = "a = ?" if (p_match or s_match) else (nums[0] + " см" if len(nums)>0 else "a")
-        title = "Квадрат"
-        if p_match:
-            title = f"Квадрат (Периметр P = {p_match.group(1)})"
-        elif s_match:
-            title = f"Квадрат (Площадь S = {s_match.group(1)})"
-            
+        p_m = re.search(r'периметр[^\d]*(\d+)', text)
+        s_m = re.search(r'площад[^\d]*(\d+)', text)
+        side = "a = ?" if (p_m or s_m) else (nums[0]+" см" if len(nums)>0 else "a")
+        title = f"Квадрат (P = {p_m.group(1)})" if p_m else (f"Квадрат (S = {s_m.group(1)})" if s_m else "Квадрат")
         img = draw_square(side, title)
         
     elif "прямоугольн" in text and ("треугольник" in text or "катет" in text or "гипотенуз" in text):
-        hyp_match = re.search(r'гипотенуз[^\d]*(\d+)', text)
-        cat_matches = re.findall(r'катет[^\d]*(\d+)', text)
-        
-        if hyp_match and len(cat_matches) > 0:
-            hyp_val = hyp_match.group(1) + " см"
-            c1 = cat_matches[0] + " см"
-            c2 = "?"
-        elif len(cat_matches) >= 2:
-            c1 = cat_matches[0] + " см"
-            c2 = cat_matches[1] + " см"
-            hyp_val = "?"
-        else:
-            c1 = nums[0] + " см" if len(nums)>0 else "a"
-            c2 = nums[1] + " см" if len(nums)>1 else "b"
-            hyp_val = nums[2] + " см" if len(nums)>2 else "c = ?"
-            
-        img = draw_right_triangle(c1, c2, hyp_val)
+        hyp_m = re.search(r'гипотенуз[^\d]*(\d+)', text)
+        cats = re.findall(r'катет[^\d]*(\d+)', text)
+        if hyp_m and len(cats)>0: img = draw_right_triangle(cats[0]+" см", "?", hyp_m.group(1)+" см")
+        elif len(cats)>=2: img = draw_right_triangle(cats[0]+" см", cats[1]+" см", "?")
+        else: img = draw_right_triangle(nums[0]+" см" if len(nums)>0 else "a", nums[1]+" см" if len(nums)>1 else "b", nums[2]+" см" if len(nums)>2 else "c = ?")
         
     elif "равносторон" in text and "треугольник" in text:
-        side = nums[0] + " см" if len(nums) > 0 else "a"
+        side = nums[0]+" см" if len(nums)>0 else "a"
         img = draw_triangle(side, "h", "Равносторонний треугольник")
         
     elif "треугольник" in text:
-        b = nums[0] + " см" if len(nums) > 0 else "a"
-        h = nums[1] + " см" if len(nums) > 1 else "h"
+        b = nums[0]+" см" if len(nums)>0 else "a"
+        h = nums[1]+" см" if len(nums)>1 else "h"
         img = draw_triangle(b, h)
         
     elif any(k in text for k in ["окружност", "круг", "радиус", "диаметр"]):
-        d_match = re.search(r'диаметр[^\d]*(\d+)', text)
-        r_match = re.search(r'радиус[^\d]*(\d+)', text)
-        
-        if d_match:
-            img = draw_circle(rad="?", diam=d_match.group(1) + " см")
-        elif r_match:
-            img = draw_circle(rad=r_match.group(1) + " см")
-        else:
-            r = nums[0] + " см" if len(nums) > 0 else "R"
-            img = draw_circle(rad=r)
-            
-    elif "смежн" in text:
-        a1 = nums[0] + "°" if len(nums) > 0 else "α"
-        a2 = "?" if len(nums) > 0 else "β"
-        img = draw_adjacent_angles(a1, a2)
-        
-    elif any(k in text for k in ["час", "стрелк", "циферблат"]):
-        hr = int(nums[0]) if len(nums) > 0 and int(nums[0]) <= 12 else 3
-        img = draw_clock(hr)
+        d_m = re.search(r'диаметр[^\d]*(\d+)', text)
+        r_m = re.search(r'радиус[^\d]*(\d+)', text)
+        if d_m: img = draw_circle(rad="?", diam=d_m.group(1)+" см")
+        elif r_m: img = draw_circle(rad=r_m.group(1)+" см")
+        else: img = draw_circle(rad=nums[0]+" см" if len(nums)>0 else "R")
         
     else:
         img = draw_rectangle("a", "b", "Геометрический чертеж")
