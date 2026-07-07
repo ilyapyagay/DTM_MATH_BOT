@@ -47,7 +47,6 @@ def clean_explanation_text(text: str) -> str:
     lines = []
     for line in text.split('\n'):
         stripped = line.lstrip()
-        # Если строка начинается с решеток (например: "### **Шаг 1**")
         if re.match(r'^#{1,6}\s*', stripped):
             cleaned_line = re.sub(r'^#{1,6}\s*', '', stripped).strip()
             if cleaned_line and not any(cleaned_line.startswith(emoji) for emoji in ['📌', '✏️', '⚡', '💡', '🔍', '🔢', '✅', '🏆', '💖', '✨']):
@@ -74,9 +73,10 @@ B) {option_b}
 C) {option_c}
 D) {option_d}
 
-ПРАВИЛЬНЫЙ ОТВЕТ: {correct_answer}
+ПРАВИЛЬНЫЙ ОТВЕТ В БАЗЕ: {correct_answer}
 
 Тепло обратись к Викуле и объясни решение подробно и понятно по шагам без символов решеток (#).
+Убедись, что твой итоговый ответ точно соответствует букве {correct_answer}.
 """
 
     try:
@@ -87,3 +87,22 @@ D) {option_d}
 
     except Exception as e:
         return f"❌ Ошибка при обращении к ИИ: {str(e)}\n\nПопробуйте позже или обратитесь к администратору."
+
+
+async def answer_followup_question(question_text: str, correct_answer: str, vika_question: str) -> str:
+    """Отвечает на уточняющий вопрос Викули по задаче"""
+    user_prompt = f"""
+📝 ИСХОДНАЯ ЗАДАЧА:
+{question_text}
+Правильный ответ: {correct_answer}
+
+❓ ВОПРОС ОТ ВИКУЛИ:
+"{vika_question}"
+
+Ответь Викуле лично, очень тепло, доступно и подробно. Разъясни непонятный момент простыми словами, поддержи её! Не используй символы # для заголовков.
+"""
+    try:
+        response = model.generate_content(f"{SYSTEM_PROMPT}\n\n{user_prompt}")
+        return clean_explanation_text(response.text)
+    except Exception as e:
+        return f"❌ Ошибка ИИ: {str(e)}"
