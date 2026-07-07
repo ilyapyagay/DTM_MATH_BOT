@@ -17,6 +17,38 @@ def get_font(size=20):
     return ImageFont.load_default()
 
 
+def extract_num(s):
+    if not s:
+        return None
+    nums = re.findall(r'\d+(?:[\.,]\d+)?', str(s))
+    if nums:
+        try:
+            return float(nums[0].replace(',', '.'))
+        except Exception:
+            pass
+    return None
+
+
+def compute_dynamic_box(val_x, val_y, center=(260, 195), max_w=320, max_h=240, min_w=100, min_h=80):
+    """Вычисляет пропорциональные координаты рамки фигуры, чтобы длинная сторона была длинной, а короткая — короткой"""
+    if not val_x or not val_y or val_x <= 0 or val_y <= 0:
+        return 110, 90, 410, 270
+    
+    ratio = val_x / val_y
+    if (max_w / ratio) <= max_h:
+        w = max_w
+        h = max_w / ratio
+    else:
+        h = max_h
+        w = max_h * ratio
+        
+    w = max(int(w), min_w)
+    h = max(int(h), min_h)
+    
+    cx, cy = center
+    return cx - w//2, cy - h//2, cx + w//2, cy + h//2
+
+
 # --- ОТРИСОВКА ГРАФИКОВ ФУНКЦИЙ (РАЗДЕЛ 9) ---
 
 def draw_function_graph(eq_str="y = kx + b", func_type="linear", k=1.0, b=0.0, a=1.0):
@@ -126,17 +158,14 @@ def draw_isosceles_angles(base_ang="50°", vert_ang="?", title="Равнобед
     
     draw.polygon([(x1, y1), (x2, y2), (x3, y3)], fill="#f3e8ff", outline="#9333ea", width=4)
     
-    # Отметки равенства сторон
     draw.line([((x1+x3)//2 - 10, (y1+y3)//2 - 5), ((x1+x3)//2 + 5, (y1+y3)//2 + 10)], fill="#9333ea", width=3)
     draw.line([((x2+x3)//2 - 5, (y2+y3)//2 + 10), ((x2+x3)//2 + 10, (y2+y3)//2 - 5)], fill="#9333ea", width=3)
     
-    # Углы при основании равны
     draw.arc([x1-50, y1-50, x1+50, y1+50], start=305, end=360, fill="#2563eb", width=3)
     draw.arc([x2-50, y2-50, x2+50, y2+50], start=180, end=235, fill="#2563eb", width=3)
     draw.text((x1 + 45, y1 - 25), str(base_ang), fill="#2563eb", font=font_label)
     draw.text((x2 - 85, y2 - 25), str(base_ang), fill="#2563eb", font=font_label)
     
-    # Угол при вершине
     draw.arc([x3-50, y3-50, x3+50, y3+50], start=55, end=125, fill="#dc2626", width=3)
     draw.text((x3 - 15, y3 + 50), str(vert_ang), fill="#dc2626", font=font_label)
     return img
@@ -200,7 +229,6 @@ def draw_angle_bisector(total="80°", half="?", title="Биссектриса у
     ry = cy - 280 * math.sin(ang_tot)
     draw.line([(cx, cy), (rx, ry)], fill="#0f172a", width=4)
     
-    # Биссектриса (пунктир или зеленый)
     ang_half = math.radians(35)
     bx = cx + 290 * math.cos(ang_half)
     by = cy - 290 * math.sin(ang_half)
@@ -258,7 +286,7 @@ def draw_parallelogram_angles(acute="60°", obtuse="?", title="Углы пара
     return img
 
 
-# --- ОСНОВНЫЕ ФИГУРЫ ---
+# --- ОСНОВНЫЕ ФИГУРЫ С ДИНАМИЧЕСКИМИ ПРОПОРЦИЯМИ ---
 
 def draw_rectangle(w_text="a", h_text="b", title="Прямоугольник"):
     img = Image.new("RGB", (520, 380), color="#f8fafc")
@@ -267,15 +295,19 @@ def draw_rectangle(w_text="a", h_text="b", title="Прямоугольник"):
     font_label = get_font(18)
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
-    x1, y1, x2, y2 = 110, 90, 410, 270
+    
+    val_w = extract_num(w_text)
+    val_h = extract_num(h_text)
+    x1, y1, x2, y2 = compute_dynamic_box(val_w, val_h)
+    
     draw.rectangle([x1, y1, x2, y2], fill="#e0f2fe", outline="#0284c7", width=4)
     
-    m = 15
+    m = min(15, (x2-x1)//4, (y2-y1)//4)
     for (cx, cy, dx, dy) in [(x1, y1, 1, 1), (x2, y1, -1, 1), (x2, y2, -1, -1), (x1, y2, 1, -1)]:
         draw.line([(cx + dx*m, cy), (cx + dx*m, cy + dy*m), (cx, cy + dy*m)], fill="#0284c7", width=2)
         
-    draw.text(((x1+x2)//2 - 25, y2 + 12), str(w_text), fill="#0f172a", font=font_label)
-    draw.text((x2 + 15, (y1+y2)//2 - 10), str(h_text), fill="#0f172a", font=font_label)
+    draw.text(((x1+x2)//2 - 25, y2 + 10), str(w_text), fill="#0f172a", font=font_label)
+    draw.text((x2 + 12, (y1+y2)//2 - 10), str(h_text), fill="#0f172a", font=font_label)
     return img
 
 
@@ -286,7 +318,9 @@ def draw_square(side_text="a", title="Квадрат"):
     font_label = get_font(18)
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
-    x1, y1, x2, y2 = 150, 80, 370, 300
+    val_s = extract_num(side_text)
+    x1, y1, x2, y2 = compute_dynamic_box(val_s, val_s)
+    
     draw.rectangle([x1, y1, x2, y2], fill="#dcfce7", outline="#16a34a", width=4)
     
     for (lx1, ly1, lx2, ly2) in [
@@ -297,8 +331,8 @@ def draw_square(side_text="a", title="Квадрат"):
     ]:
         draw.line([lx1, lx2], fill="#16a34a", width=3)
         
-    draw.text(((x1+x2)//2 - 20, y2 + 15), str(side_text), fill="#0f172a", font=font_label)
-    draw.text((x2 + 15, (y1+y2)//2 - 10), str(side_text), fill="#0f172a", font=font_label)
+    draw.text(((x1+x2)//2 - 20, y2 + 12), str(side_text), fill="#0f172a", font=font_label)
+    draw.text((x2 + 12, (y1+y2)//2 - 10), str(side_text), fill="#0f172a", font=font_label)
     return img
 
 
@@ -309,16 +343,19 @@ def draw_right_triangle(cat1="a", cat2="b", hypot="c", title="Прямоугол
     font_label = get_font(18)
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
-    x1, y1 = 120, 310
-    x2, y2 = 410, 310
-    x3, y3 = 120, 80
     
-    draw.polygon([(x1, y1), (x2, y2), (x3, y3)], fill="#fef9c3", outline="#ca8a04", width=4)
-    m = 20
-    draw.line([(x1+m, y1), (x1+m, y1-m), (x1, y1-m)], fill="#ca8a04", width=2)
+    val_c1 = extract_num(cat1)
+    val_c2 = extract_num(cat2)
+    x1, y1, x2, y2 = compute_dynamic_box(val_c1, val_c2)
     
-    draw.text(((x1+x2)//2 - 20, y1 + 12), str(cat1), fill="#0f172a", font=font_label)
-    draw.text((x1 - 65, (y1+y3)//2), str(cat2), fill="#0f172a", font=font_label)
+    x3, y3 = x1, y1
+    draw.polygon([(x1, y2), (x2, y2), (x3, y3)], fill="#fef9c3", outline="#ca8a04", width=4)
+    
+    m = min(20, (x2-x1)//4, (y2-y3)//4)
+    draw.line([(x1+m, y2), (x1+m, y2-m), (x1, y2-m)], fill="#ca8a04", width=2)
+    
+    draw.text(((x1+x2)//2 - 20, y2 + 10), str(cat1), fill="#0f172a", font=font_label)
+    draw.text((x1 - 65, (y2+y3)//2), str(cat2), fill="#0f172a", font=font_label)
     draw.text(((x2+x3)//2 + 15, (y2+y3)//2 - 15), str(hypot), fill="#0f172a", font=font_label)
     return img
 
@@ -330,18 +367,19 @@ def draw_triangle(base="a", height="h", title="Треугольник"):
     font_label = get_font(18)
     
     draw.text((25, 20), title, fill="#0f172a", font=font_title)
-    x1, y1 = 90, 310
-    x2, y2 = 430, 310
-    x3, y3 = 240, 80
+    val_b = extract_num(base)
+    val_h = extract_num(height)
+    x1, y1, x2, y2 = compute_dynamic_box(val_b, val_h)
     
-    draw.polygon([(x1, y1), (x2, y2), (x3, y3)], fill="#f3e8ff", outline="#9333ea", width=4)
-    draw.line([(x3, y3), (x3, y1)], fill="#9333ea", width=2)
+    x3, y3 = (x1+x2)//2, y1
+    draw.polygon([(x1, y2), (x2, y2), (x3, y3)], fill="#f3e8ff", outline="#9333ea", width=4)
+    draw.line([(x3, y3), (x3, y2)], fill="#9333ea", width=2)
     
-    m = 12
-    draw.line([(x3, y1-m), (x3+m, y1-m), (x3+m, y1)], fill="#9333ea", width=2)
+    m = min(12, (x2-x1)//6, (y2-y3)//6)
+    draw.line([(x3, y2-m), (x3+m, y2-m), (x3+m, y2)], fill="#9333ea", width=2)
     
-    draw.text(((x1+x2)//2 - 20, y1 + 12), f"a = {base}", fill="#0f172a", font=font_label)
-    draw.text((x3 + 8, (y1+y3)//2), f"h = {height}", fill="#9333ea", font=font_label)
+    draw.text(((x1+x2)//2 - 20, y2 + 10), f"a = {base}", fill="#0f172a", font=font_label)
+    draw.text((x3 + 8, (y2+y3)//2), f"h = {height}", fill="#9333ea", font=font_label)
     return img
 
 
@@ -396,7 +434,7 @@ def draw_clock(hour=3, title="Циферблат часов"):
 
 
 def generate_geometry_image(question_text: str, section_id: int = 10) -> bytes:
-    """Интеллектуальная генерация чертежа (Раздел 10) или графика (Раздел 9) по условиям задачи"""
+    """Интеллектуальная генерация графика (Раздел 9) или пропорционального чертежа (Раздел 10)"""
     text = question_text.lower()
     nums = re.findall(r'\b\d+(?:[\.,]\d+)?\b', question_text)
     
@@ -455,12 +493,12 @@ def generate_geometry_image(question_text: str, section_id: int = 10) -> bytes:
         img.save(buf, format="PNG")
         return buf.getvalue()
 
-    # 3. РАЗДЕЛ 10: ПЛАНИМЕТРИЯ — ФИГУРЫ
+    # 3. РАЗДЕЛ 10: ПЛАНИМЕТРИЯ — ФИГУРЫ С ПРОПОРЦИЯМИ
     if "прямоугольник" in text and "треугольник" not in text:
-        p_m = re.search(r'периметр[^\d]*(\d+)', text)
-        s_m = re.search(r'площад[^\d]*(\d+)', text)
-        l_m = re.search(r'длин[^\d]*(\d+)', text)
-        w_m = re.search(r'ширин[^\d]*(\d+)', text)
+        p_m = re.search(r'периметр[^\d]*(\d+(?:[\.,]\d+)?)', text)
+        s_m = re.search(r'площад[^\d]*(\d+(?:[\.,]\d+)?)', text)
+        l_m = re.search(r'длин[^\d]*(\d+(?:[\.,]\d+)?)', text)
+        w_m = re.search(r'ширин[^\d]*(\d+(?:[\.,]\d+)?)', text)
         
         w_val = w_m.group(1)+" см" if w_m else ("?" if (p_m or s_m) and l_m else (nums[0]+" см" if len(nums)>0 else "a"))
         h_val = l_m.group(1)+" см" if l_m else ("?" if (p_m or s_m) and w_m else (nums[1]+" см" if len(nums)>1 else "b"))
@@ -471,22 +509,22 @@ def generate_geometry_image(question_text: str, section_id: int = 10) -> bytes:
         img = draw_rectangle(w_val, h_val, title)
         
     elif "квадрат" in text:
-        p_m = re.search(r'периметр[^\d]*(\d+)', text)
-        s_m = re.search(r'площад[^\d]*(\d+)', text)
+        p_m = re.search(r'периметр[^\d]*(\d+(?:[\.,]\d+)?)', text)
+        s_m = re.search(r'площад[^\d]*(\d+(?:[\.,]\d+)?)', text)
         side = "a = ?" if (p_m or s_m) else (nums[0]+" см" if len(nums)>0 else "a")
         title = f"Квадрат (P = {p_m.group(1)})" if p_m else (f"Квадрат (S = {s_m.group(1)})" if s_m else "Квадрат")
         img = draw_square(side, title)
         
     elif "прямоугольн" in text and ("треугольник" in text or "катет" in text or "гипотенуз" in text):
-        hyp_m = re.search(r'гипотенуз[^\d]*(\d+)', text)
-        cats = re.findall(r'катет[^\d]*(\d+)', text)
+        hyp_m = re.search(r'гипотенуз[^\d]*(\d+(?:[\.,]\d+)?)', text)
+        cats = re.findall(r'катет[^\d]*(\d+(?:[\.,]\d+)?)', text)
         if hyp_m and len(cats)>0: img = draw_right_triangle(cats[0]+" см", "?", hyp_m.group(1)+" см")
         elif len(cats)>=2: img = draw_right_triangle(cats[0]+" см", cats[1]+" см", "?")
         else: img = draw_right_triangle(nums[0]+" см" if len(nums)>0 else "a", nums[1]+" см" if len(nums)>1 else "b", nums[2]+" см" if len(nums)>2 else "c = ?")
         
     elif "равносторон" in text and "треугольник" in text:
         side = nums[0]+" см" if len(nums)>0 else "a"
-        img = draw_triangle(side, "h", "Равносторонний треугольник")
+        img = draw_triangle(side, side, "Равносторонний треугольник")
         
     elif "треугольник" in text:
         b = nums[0]+" см" if len(nums)>0 else "a"
@@ -494,8 +532,8 @@ def generate_geometry_image(question_text: str, section_id: int = 10) -> bytes:
         img = draw_triangle(b, h)
         
     elif any(k in text for k in ["окружност", "круг", "радиус", "диаметр"]):
-        d_m = re.search(r'диаметр[^\d]*(\d+)', text)
-        r_m = re.search(r'радиус[^\d]*(\d+)', text)
+        d_m = re.search(r'диаметр[^\d]*(\d+(?:[\.,]\d+)?)', text)
+        r_m = re.search(r'радиус[^\d]*(\d+(?:[\.,]\d+)?)', text)
         if d_m: img = draw_circle(rad="?", diam=d_m.group(1)+" см")
         elif r_m: img = draw_circle(rad=r_m.group(1)+" см")
         else: img = draw_circle(rad=nums[0]+" см" if len(nums)>0 else "R")
